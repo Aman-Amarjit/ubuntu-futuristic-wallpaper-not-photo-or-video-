@@ -6,6 +6,12 @@ A sci-fi cyberpunk heads-up display rendered as an interactive **live desktop wa
 
 ---
 
+## 📸 Preview
+
+![AAJ Cybernetic HUD Screenshot](./screenshots/hud-screenshot.png)
+
+---
+
 ## ✨ Features
 
 - 🎬 **Live video feed** in the center HUD panel (looping `.mp4` playback)
