@@ -1,6 +1,6 @@
 # AAJ Cybernetic HUD — Live Wallpaper System
 
-> ⚠️ **Linux only** — Tested on **Ubuntu 22.04 / 24.04** with GNOME on Wayland. Does **not** work on Windows, macOS, or X11.
+> ⚠️ **Linux only** — Tested on **Ubuntu 26.04 / 24.04** with GNOME on Wayland. Does **not** work on Windows, macOS, or X11.
 
 A sci-fi cyberpunk heads-up display rendered as an interactive **live desktop wallpaper** on GNOME/Wayland. Built with vanilla HTML, CSS, and JavaScript — powered by [Hidamari](https://github.com/jeffshee/hidamari) and a local Python stats server.
 
