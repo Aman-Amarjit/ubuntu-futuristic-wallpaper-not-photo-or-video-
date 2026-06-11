@@ -61,8 +61,18 @@
 
       <!-- Center HUD Graphic Core (SVG Concentric Rings) -->
       <section class="hud-center">
+
+
         <!-- Cybernetic Cockpit Window Frame Overlay -->
         <div class="cockpit-frame-container">
+          <!-- Video Background covering the inside of HUD (HTML sibling to SVG to bypass scaling bugs) -->
+          <div class="hud-video-container">
+            <video class="hud-video" autoplay loop muted playsinline preload="auto">
+              <source src="cozy_vibe3.webm" type="video/webm">
+              <source src="cozy_vibe3.mp4" type="video/mp4">
+            </video>
+            <div class="hud-video-overlay"></div>
+          </div>
           <svg viewBox="0 0 1200 800" class="cockpit-frame-svg">
             <defs>
               <!-- Hexagon grid inside background -->
@@ -80,13 +90,16 @@
                   <feMergeNode in="SourceGraphic" />
                 </feMerge>
               </filter>
+              
+              <!-- Clip path for cockpit frame boundary -->
+              <clipPath id="cockpit-clip">
+                <path d="M 350,70 L 520,70 L 550,100 L 650,100 L 680,70 L 850,70 L 1050,120 L 1100,220 L 1100,580 L 1050,680 L 850,730 L 680,730 L 650,700 L 550,700 L 520,730 L 350,730 L 150,680 L 100,580 L 100,220 L 150,120 Z" />
+              </clipPath>
             </defs>
             
             <!-- Tech Grid Background inside Frame -->
-            <clipPath id="cockpit-clip">
-              <path d="M 350,70 L 520,70 L 550,100 L 650,100 L 680,70 L 850,70 L 1050,120 L 1100,220 L 1100,580 L 1050,680 L 850,730 L 680,730 L 650,700 L 550,700 L 520,730 L 350,730 L 150,680 L 100,580 L 100,220 L 150,120 Z" />
-            </clipPath>
             <rect width="1200" height="800" fill="url(#dot-grid)" clip-path="url(#cockpit-clip)" />
+            
             
             <!-- Outer Cockpit Border Line -->
             <path class="cockpit-outer-line" d="M 350,70 L 520,70 L 550,100 L 650,100 L 680,70 L 850,70 L 1050,120 L 1100,220 L 1100,580 L 1050,680 L 850,730 L 680,730 L 650,700 L 550,700 L 520,730 L 350,730 L 150,680 L 100,580 L 100,220 L 150,120 Z" filter="url(#hud-glow)"/>
@@ -135,11 +148,11 @@
               <line x1="105" y1="600" x2="120" y2="600" class="scale-tick-major" />
               
               <!-- Labels -->
-              <text x="95" y="204" text-anchor="end" class="scale-text">10000</text>
-              <text x="95" y="304" text-anchor="end" class="scale-text">8000</text>
-              <text x="95" y="404" text-anchor="end" class="scale-text">6000</text>
-              <text x="95" y="504" text-anchor="end" class="scale-text">4000</text>
-              <text x="95" y="604" text-anchor="end" class="scale-text">2000</text>
+              <text x="95" y="204" text-anchor="end" class="scale-text">100%</text>
+              <text x="95" y="304" text-anchor="end" class="scale-text">75%</text>
+              <text x="95" y="404" text-anchor="end" class="scale-text">50%</text>
+              <text x="95" y="504" text-anchor="end" class="scale-text">25%</text>
+              <text x="95" y="604" text-anchor="end" class="scale-text">0%</text>
               
               <!-- Red Pointer Cursor -->
               <polygon points="120,400 132,393 132,407" class="scale-pointer" id="left-pointer" />
@@ -175,11 +188,11 @@
               <line x1="1080" y1="600" x2="1095" y2="600" class="scale-tick-major" />
               
               <!-- Labels -->
-              <text x="1105" y="204" text-anchor="start" class="scale-text">10000</text>
-              <text x="1105" y="304" text-anchor="start" class="scale-text">8000</text>
-              <text x="1105" y="404" text-anchor="start" class="scale-text">6000</text>
-              <text x="1105" y="504" text-anchor="start" class="scale-text">4000</text>
-              <text x="1105" y="604" text-anchor="start" class="scale-text">2000</text>
+              <text x="1105" y="204" text-anchor="start" class="scale-text">100%</text>
+              <text x="1105" y="304" text-anchor="start" class="scale-text">75%</text>
+              <text x="1105" y="404" text-anchor="start" class="scale-text">50%</text>
+              <text x="1105" y="504" text-anchor="start" class="scale-text">25%</text>
+              <text x="1105" y="604" text-anchor="start" class="scale-text">0%</text>
               
               <!-- Red Pointer Cursor -->
               <polygon points="1080,400 1068,393 1068,407" class="scale-pointer" id="right-pointer" />
@@ -198,15 +211,6 @@
 
         <!-- SVG Interactive holographic rings -->
         <div class="hud-core-wrapper">
-          <!-- Live Video Feed (Replaces Radar Sweep) -->
-
-
-          <div class="hud-video-container">
-            <video class="hud-video" autoplay loop muted playsinline preload="auto" width="100%" height="100%">
-              <source src="cozy_vibe.mp4" type="video/mp4">
-            </video>
-            <div class="hud-video-overlay"></div>
-          </div>
           <!-- All HUD radar graphic SVG layers removed to clear space for the video feed -->
 
           <!-- Floating HUD Text Overlays (Linked to actual system stats) -->
@@ -403,6 +407,12 @@
                 <span class="btn-icon">🍃</span>
                 <span class="btn-text">ECO POWER MODE</span>
               </button>
+
+              <button class="ctrl-btn" id="horny-mode-btn" style="grid-column: span 2;">
+                <span class="btn-icon">😈</span>
+                <span class="btn-text">HORNY MODE</span>
+              </button>
+
 
             </div>
 

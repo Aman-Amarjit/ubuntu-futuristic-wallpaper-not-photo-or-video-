@@ -396,6 +396,22 @@ body {
   position: relative;
 }
 
+.hud-video-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100%, 150vh);
+  height: min(100%, 66.67vw);
+  max-width: 1200px;
+  max-height: 800px;
+  aspect-ratio: 1200 / 800;
+  overflow: hidden;
+  z-index: 1;
+  clip-path: polygon(29.17% 8.75%, 43.33% 8.75%, 45.83% 12.5%, 54.17% 12.5%, 56.67% 8.75%, 70.83% 8.75%, 87.5% 15%, 91.67% 27.5%, 91.67% 72.5%, 87.5% 85%, 70.83% 91.25%, 56.67% 91.25%, 54.17% 87.5%, 45.83% 87.5%, 43.33% 91.25%, 29.17% 91.25%, 12.5% 85%, 8.33% 72.5%, 8.33% 27.5%, 12.5% 15%);
+  -webkit-clip-path: polygon(29.17% 8.75%, 43.33% 8.75%, 45.83% 12.5%, 54.17% 12.5%, 56.67% 8.75%, 70.83% 8.75%, 87.5% 15%, 91.67% 27.5%, 91.67% 72.5%, 87.5% 85%, 70.83% 91.25%, 56.67% 91.25%, 54.17% 87.5%, 45.83% 87.5%, 43.33% 91.25%, 29.17% 91.25%, 12.5% 85%, 8.33% 72.5%, 8.33% 27.5%, 12.5% 15%);
+}
+
 .hud-core-wrapper {
   position: relative;
   width: 90%;
@@ -427,30 +443,16 @@ body {
   height: 100%;
 }
 
-.hud-video-container {
-  /* Shrunk to 78% so the corner readout boxes sit in the gap
-     between the video edge and the cockpit frame — no more overlap */
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 78%;
-  height: 78%;
-  border: 1px solid var(--color-primary);
-  box-shadow: 0 0 12px var(--color-primary-glow);
-  pointer-events: auto;
-  transition: border-color 0.3s ease;
-}
+
 
 .hud-video {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  /* CSS filter removed: brightness/contrast forces per-frame GPU compositing pass.
-     The video looks great without it, and this saves significant GPU bandwidth. */
+  object-fit: cover;
   -webkit-backface-visibility: hidden;
   transform: translate3d(0, 0, 0);
+  filter: brightness(1.35) contrast(1.15) drop-shadow(0 0 10px rgba(0, 200, 255, 0.5));
 }
 
 .hud-video-overlay {
@@ -461,7 +463,7 @@ body {
   height: 100%;
   background-color: var(--color-primary-glow);
   pointer-events: none;
-  opacity: 0.25; /* Light translucent tint to avoid mix-blend-mode rendering bugs */
+  opacity: 0.25;
   transition: background-color 0.3s ease;
 }
 
@@ -1195,23 +1197,26 @@ body {
 }
 
 .cockpit-frame-svg {
-  width: 100%;
-  height: 100%;
+  width: min(100%, 150vh);
+  height: min(100%, 66.67vw);
   max-width: 1200px;
   max-height: 800px;
+  aspect-ratio: 1200 / 800;
+  position: relative;
+  z-index: 2;
 }
 
 .cockpit-outer-line {
   stroke: var(--color-primary);
-  stroke-width: 1.2;
+  stroke-width: 3.5;
   stroke-linejoin: round;
-  fill: rgba(2, 4, 6, 0.4);
+  fill: none;
   transition: stroke 0.3s ease;
 }
 
 .cockpit-inner-line {
   stroke: var(--color-primary-bright);
-  stroke-width: 0.6;
+  stroke-width: 2.0;
   stroke-linejoin: round;
   fill: none;
   transition: stroke 0.3s ease;
@@ -1219,7 +1224,7 @@ body {
 
 .cockpit-accent-plate {
   stroke: var(--color-primary-bright);
-  stroke-width: 1.5;
+  stroke-width: 4.5;
   stroke-linecap: round;
   fill: none;
   transition: stroke 0.3s ease;
@@ -1332,6 +1337,12 @@ body {
   max-width: 95vw !important;
   max-height: 95vh !important;
 }
+
+.mode-clean .hud-video-container {
+  max-width: 95vw !important;
+  max-height: 95vh !important;
+}
+
 
 /* Window Obscured Mode: freezes ALL animations when wallpaper is covered by a fullscreen window.
  * Applied automatically by JS when the compositor stops sending frame callbacks.
