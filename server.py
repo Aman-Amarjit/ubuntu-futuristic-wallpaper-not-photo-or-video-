@@ -68,8 +68,9 @@ class HUDRequestHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
     def end_headers(self):
-        # Only apply aggressive no-cache to API endpoints
-        if self.path.startswith("/api/"):
+        # Apply aggressive no-cache to APIs, JS, CSS, and HTML to ensure updates load instantly
+        clean_path = self.path.split('?')[0]
+        if self.path.startswith("/api/") or any(clean_path.endswith(ext) for ext in [".js", ".css", ".html"]):
             self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")
@@ -101,6 +102,8 @@ class HUDRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_api_desktop_files(parsed_url.query)
         elif parsed_url.path == "/api/open-desktop-item":
             self.handle_api_open_desktop_item(parsed_url.query)
+        elif parsed_url.path == "/api/videos":
+            self.handle_api_videos()
         else:
             super().do_GET()
 
@@ -307,6 +310,18 @@ class HUDRequestHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_json_response(500, {"error": str(e)})
 
+
+    def handle_api_videos(self):
+        """Return sorted list of video files in the HUD directory."""
+        try:
+            video_exts = {'.mp4', '.webm', '.mkv', '.mov', '.avi'}
+            files = []
+            for name in sorted(os.listdir(DIRECTORY)):
+                if os.path.splitext(name)[1].lower() in video_exts:
+                    files.append(name)
+            self.send_json_response(200, {"videos": files})
+        except Exception as e:
+            self.send_json_response(500, {"error": str(e)})
 
     def do_POST(self):
         parsed_url = urllib.parse.urlparse(self.path)

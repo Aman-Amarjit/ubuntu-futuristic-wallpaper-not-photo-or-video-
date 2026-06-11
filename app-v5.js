@@ -120,6 +120,87 @@ function playChirp(type = 'click') {
 }
 
 // -------------------------------------------------------------
+// Video Playlist Manager
+// Fetches all video files from the server, plays them in order,
+// advances to the next on 'ended', and loops back to the start.
+// -------------------------------------------------------------
+let playlist = [];
+let playlistIndex = 0;
+let videoTransitionPending = false; // guard against double-advance
+
+async function loadPlaylist() {
+  try {
+    const res = await fetch('http://localhost:8000/api/videos');
+    if (!res.ok) throw new Error('Failed to fetch video list');
+    const data = await res.json();
+    if (data.videos && data.videos.length > 0) {
+      const webmFiles = data.videos.filter(v => v.endsWith('.webm'));
+      playlist = webmFiles.length > 0 ? webmFiles : data.videos;
+    } else {
+      playlist = ['cozy_vibe.webm'];
+    }
+  } catch (e) {
+    console.warn('Playlist load failed, using fallback:', e);
+    playlist = ['cozy_vibe.webm'];
+  }
+  playlistIndex = 0;
+
+  const video = document.querySelector('.hud-video');
+  if (video) {
+    video.loop = true;
+  }
+
+  setVideoSource(playlist[0]);
+}
+
+function setVideoSource(filename) {
+  const video = document.querySelector('.hud-video');
+  if (!video) return;
+
+  // Stop the old video cleanly before switching source
+  video.pause();
+  video.removeAttribute('src');
+  video.load(); // flush the media pipeline
+
+  // Small delay to let the browser fully reset before assigning new src
+  setTimeout(() => {
+    video.src = filename;
+    video.load();
+
+    // Videos act as full-screen wallpapers, no scaling needed
+    video.style.transformOrigin = 'center center';
+    video.style.transform = 'translate3d(0, 0, 0)';
+
+    video.oncanplaythrough = () => {
+      video.oncanplaythrough = null;
+      videoTransitionPending = false;
+      if (!document.hidden && !isSuspended) {
+        video.play().catch(err => console.warn('play() failed for', filename, err));
+      }
+    };
+
+    if (document.getElementById('feed-log')) {
+      addStatusLine(`NOW PLAYING: ${filename.toUpperCase()}`, 'info');
+    }
+  }, 80);
+}
+
+function playNextVideo() {
+  // Guard: ignore duplicate ended/error calls during a transition
+  if (videoTransitionPending) return;
+  videoTransitionPending = true;
+
+  if (playlist.length === 0) {
+    videoTransitionPending = false;
+    return;
+  }
+  playlistIndex = (playlistIndex + 1) % playlist.length;
+  setVideoSource(playlist[playlistIndex]);
+}
+
+// Wire up playlist and kick off video loading inside the main DOMContentLoaded below.
+// (No separate DOMContentLoaded here — consolidated to avoid race conditions.)
+// -------------------------------------------------------------
 // Interactive Clock Display
 // -------------------------------------------------------------
 function updateClock() {
@@ -214,6 +295,18 @@ async function updateResources() {
     ramVal = data.ram;
     gpuVal = data.disk; // Use disk storage for GPU meter fallback
 
+    // Update API status indicators
+    setDOMTextIfChanged('hud-status-text', 'ONLINE');
+    setDOMClassIfChanged('hud-status-text', 'calc-val text-success');
+    const indicatorEl = document.querySelector('.status-indicator');
+    if (indicatorEl && indicatorEl.className !== 'status-indicator online') {
+      indicatorEl.className = 'status-indicator online';
+    }
+    const diagnosticEl = document.querySelector('.diagnostic-readout');
+    if (diagnosticEl && diagnosticEl.textContent !== 'SYSTEM ACTIVE // ALL CORES NOMINAL') {
+      diagnosticEl.textContent = 'SYSTEM ACTIVE // ALL CORES NOMINAL';
+    }
+
     // Update DOM readouts
     setDOMTextIfChanged('cpu-val', cpuVal.toString().padStart(2, '0') + '%');
     setDOMTextIfChanged('ram-val', ramVal.toString().padStart(2, '0') + '%');
@@ -292,12 +385,15 @@ async function updateResources() {
       lastIsDischarging = isDischarging;
 
       if (!userPowerOverride) {
-        if (isDischarging && !hasEcoClass) {
+        // Auto-engage Eco Mode only if discharging and battery is low (< 25%)
+        if (isDischarging && batLevel < 25 && !hasEcoClass) {
           toggleEcoMode(true, true);
-          addStatusLine("BATTERY RUNNING: AUTO-ENGAGING ECO POWER MODE", "warn");
-        } else if (!isDischarging && hasEcoClass) {
+          addStatusLine("CRITICAL BATTERY: AUTO-ENGAGING ECO POWER MODE", "warn");
+        } 
+        // Return to performance mode if charging, OR if discharging but battery is above critical (>= 25%) and currently in eco mode
+        else if ((!isDischarging || (isDischarging && batLevel >= 25)) && hasEcoClass) {
           toggleEcoMode(false, true);
-          addStatusLine("CHARGER CONNECTED: RETURNING TO PERFORMANCE MODE", "success");
+          addStatusLine(isDischarging ? "BATTERY NORMAL: RETURNING TO PERFORMANCE MODE" : "CHARGER CONNECTED: RETURNING TO PERFORMANCE MODE", "success");
         }
       }
     } else {
@@ -367,6 +463,19 @@ async function updateResources() {
     updateScales();
   } catch (error) {
     isApiOnline = false;
+    
+    // Update API status indicators to offline
+    setDOMTextIfChanged('hud-status-text', 'OFFLINE');
+    setDOMClassIfChanged('hud-status-text', 'calc-val text-alert');
+    const indicatorEl = document.querySelector('.status-indicator');
+    if (indicatorEl && indicatorEl.className !== 'status-indicator offline') {
+      indicatorEl.className = 'status-indicator offline';
+    }
+    const diagnosticEl = document.querySelector('.diagnostic-readout');
+    if (diagnosticEl && diagnosticEl.textContent !== 'CRITICAL // SERVER CONNECTION LOST') {
+      diagnosticEl.textContent = 'CRITICAL // SERVER CONNECTION LOST';
+    }
+
     // Fallback simulation mode
     cpuVal = Math.min(100, Math.max(5, cpuVal + Math.floor(Math.random() * 15) - 7));
     ramVal = Math.min(100, Math.max(30, ramVal + Math.floor(Math.random() * 3) - 1));
@@ -405,15 +514,30 @@ async function updateResources() {
   }
 }
 
+// Cache sparkline colors so getComputedStyle isn't called on every draw tick.
+// Invalidated when the theme changes via changeTheme().
+let _sparklineStrokeColor = null;
+let _sparklineGlowColor = null;
+
+function invalidateSparklineColorCache() {
+  _sparklineStrokeColor = null;
+  _sparklineGlowColor = null;
+}
+
 function drawSparkline() {
   const width = sparklineCanvas.width / window.devicePixelRatio;
   const height = sparklineCanvas.height / window.devicePixelRatio;
   
   sparklineCtx.clearRect(0, 0, width, height);
 
-  const computedStyle = getComputedStyle(document.body);
-  const strokeColor = computedStyle.getPropertyValue('--color-primary').trim();
-  const glowColor = computedStyle.getPropertyValue('--color-primary-glow').trim();
+  // Read computed CSS custom properties once and cache; only re-read after a theme change.
+  if (!_sparklineStrokeColor) {
+    const computedStyle = getComputedStyle(document.body);
+    _sparklineStrokeColor = computedStyle.getPropertyValue('--color-primary').trim();
+    _sparklineGlowColor   = computedStyle.getPropertyValue('--color-primary-glow').trim();
+  }
+  const strokeColor = _sparklineStrokeColor;
+  const glowColor   = _sparklineGlowColor;
 
   // Draw grid helper lines
   sparklineCtx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
@@ -462,13 +586,18 @@ async function scheduleNextResourceUpdate() {
     resourceUpdateTimeout = null;
   }
 
-  const isObscured = (Date.now() - lastRafTime) > 2000;
-  if (document.hidden || isObscured) {
-    return; // Pause updates completely when window is hidden or obscured
-  }
+  // Don't poll when suspended or tab is hidden
+  if (isSuspended || document.hidden) return;
 
   const isEco = document.body.classList.contains('eco-mode');
-  const delay = isEco ? 12000 : 4000;
+  const isBgThrottle = document.body.classList.contains('bg-throttle');
+  // Delay tiers:
+  //   performance normal : 2s
+  //   eco power mode     : 5s
+  //   background app     : 10s
+  const delay = isBgThrottle ? 10000
+    : isEco ? 5000
+    : 2000;
 
   resourceUpdateTimeout = setTimeout(async () => {
     await updateResources();
@@ -477,30 +606,33 @@ async function scheduleNextResourceUpdate() {
 }
 
 // Centralized Video State Manager
+// Pauses video when window is invisible, obscured, or eco mode is active.
 function updateVideoState() {
   const video = document.querySelector('.hud-video');
   if (!video) return;
 
-  const isEco = document.body.classList.contains('eco-mode');
   const isHidden = document.hidden;
   const isObscured = (Date.now() - lastRafTime) > 2000;
-  const shouldPause = isEco || isHidden || isObscured;
+  const isEco = document.body.classList.contains('eco-mode');
+  const shouldPauseVideo = isHidden || isObscured || isEco;
 
-  if (shouldPause) {
-    // Freeze all CSS animations to drop CPU to near-zero when covered
-    document.body.classList.add('window-obscured');
+  if (shouldPauseVideo) {
     if (!video.paused) {
       video.pause();
-      if (isObscured && !isHidden && !isEco) {
+      if (isObscured && !isHidden) {
         wasObscured = true;
         addStatusLine("WALLPAPER COVERED: PAUSING DECODER", "info");
       }
     }
+    // Only freeze CSS animations when truly obscured, not just hidden
+    if (isObscured) {
+      document.body.classList.add('window-obscured');
+    }
   } else {
-    // Resume CSS animations
+    // Window is visible — ensure video plays
     document.body.classList.remove('window-obscured');
-    if (video.paused) {
-      // Only log the resume message when we're actually resuming from pause
+    // Only resume if the source is fully loaded and no transition is in progress.
+    if (video.paused && video.readyState >= 3 && !videoTransitionPending) {
       video.play().catch(err => {
         console.warn("Failed to play primary video:", err);
       });
@@ -534,16 +666,20 @@ function suspendAllJS() {
   // Freeze all CSS animations & remove backdrop-filter cost
   document.body.classList.add('window-obscured');
 
-  // Pause video decoder
-  const video = document.querySelector('.hud-video');
-  if (video && !video.paused) {
-    video.pause();
-  }
+  // NOTE: Video is intentionally NOT paused here.
+  // suspendAllJS is triggered by visibilitychange (e.g. user switches apps briefly).
+  // Pausing the video on every focus-loss causes it to stop permanently because
+  // the resume path has race conditions with isSuspended guards.
+  // Video is only paused when the compositor fully covers the window (isObscured).
 }
 
 function resumeAllJS() {
   if (!isSuspended) return;
   isSuspended = false;
+
+  // Reset lastRafTime so the watchdog doesn't immediately re-suspend
+  // (lastRafTime was frozen during suspension, making it appear stale)
+  lastRafTime = Date.now();
 
   // Restart clock
   if (!clockInterval) {
@@ -554,20 +690,20 @@ function resumeAllJS() {
   // Resume CSS animations
   document.body.classList.remove('window-obscured');
 
-  // Resume video
+  // Ensure video is playing (restart if it was paused by obscuration)
   const video = document.querySelector('.hud-video');
-  if (video && video.paused) {
+  if (video && video.paused && !document.hidden) {
     video.play().catch(err => console.warn('Resume play failed:', err));
     addStatusLine('WALLPAPER UNCOVERED: RESUMING HUD', 'success');
   }
 
-  // Restart resource polling
-  updateResources();
-  scheduleNextResourceUpdate();
+  // Restart resource polling without double-polling
+  updateResources().then(() => scheduleNextResourceUpdate());
 }
 
-// Start scheduling
-scheduleNextResourceUpdate();
+// Start scheduling — call updateResources immediately so stats show on first load,
+// then schedule the recurring poll loop.
+updateResources().then(() => scheduleNextResourceUpdate());
 
 // -------------------------------------------------------------
 // Live Log Status Feed System
@@ -976,6 +1112,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Theme switching function
 function changeTheme(themeName) {
+  // Bust sparkline color cache so next draw picks up the new CSS custom properties
+  invalidateSparklineColorCache();
   // Update body class
   document.body.className = '';
   document.body.classList.add(themeName);
@@ -997,6 +1135,7 @@ function changeTheme(themeName) {
 document.querySelectorAll('.theme-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const selectedTheme = btn.getAttribute('data-theme');
+    invalidateSparklineColorCache();
     changeTheme(selectedTheme);
     playChirp('click');
   });
@@ -1111,49 +1250,92 @@ function toggleCleanMode() {
 
 // Event listeners for toggle gestures
 document.addEventListener('DOMContentLoaded', () => {
-  // Guarantee local video playback to bypass browser autoplay policies
   const video = document.querySelector('.hud-video');
   if (video) {
-    video.loop = true;
+    // Playlist: advance to next video when current one ends
+    video.addEventListener('ended', playNextVideo);
 
+    // Fallback trigger play on interaction (bypass autoplay policy)
     const playVideo = () => {
-      video.play().catch(err => {
-        console.warn("Autoplay primary play trigger failed:", err);
-      });
+      if (video.paused && !videoTransitionPending) {
+        video.play().catch(err => {
+          console.warn("Autoplay primary play trigger failed:", err);
+        });
+      }
     };
-    playVideo();
-    // Fallback trigger play on interaction
     document.addEventListener('click', playVideo, { once: true });
     document.addEventListener('keydown', playVideo, { once: true });
 
-    // Force loop repeat playback on video completion (WebKitGTK loop bug fallback)
-    video.addEventListener('ended', () => {
-      video.currentTime = 0;
-      video.play().catch(err => {
-        console.warn("Manual loop repetition failed:", err);
-      });
-    });
-
     // Handle system wake/sleep and wallpaper visibility changes
-    // Hidamari fires visibilitychange when is_pause_when_maximized triggers.
-    // We use our global suspend/resume to halt ALL JS activity.
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         suspendAllJS();
+        if (!video.paused) video.pause();
       } else {
         resumeAllJS();
+        if (video.paused && !videoTransitionPending && !document.body.classList.contains('eco-mode')) {
+          video.play().catch(err => console.warn('Visibility resume failed:', err));
+        }
       }
     });
 
-    // Reload and play if media playback crashes or hits a codec error
-    video.addEventListener('error', () => {
-      console.warn("Video playback error detected. Reloading video...");
-      video.load();
-      if (!isSuspended) updateVideoState();
+    // Background power save: when user switches to another app the wallpaper
+    // loses window focus. Slow down polling and freeze non-video animations.
+    // Only activates if the window had focus at least once first — prevents
+    // Hidamari from starting in permanent bg-throttle since it's never focused at boot.
+    let hadFocus = false;
+    window.addEventListener('focus', () => {
+      hadFocus = true;
+      document.body.classList.remove('bg-throttle');
+      // Update resources immediately, then schedule next updates
+      updateResources().then(() => scheduleNextResourceUpdate());
+    });
+
+    window.addEventListener('blur', () => {
+      if (!hadFocus) return; // ignore the initial unfocused state at startup
+      if (!isSuspended) {
+        document.body.classList.add('bg-throttle');
+        scheduleNextResourceUpdate(); // reschedule with slower delay
+      }
+    });
+
+    // On codec/network error: skip to next video instead of hanging
+    let lastErrorTime = 0;
+    let errorCount = 0;
+    video.addEventListener('error', (e) => {
+      const src = video.src || 'unknown';
+      console.warn(`Video error on ${src}:`, e);
+      // Reset the transition guard so playNextVideo can proceed
+      videoTransitionPending = false;
+
+      const now = Date.now();
+      if (now - lastErrorTime < 2000) {
+        errorCount++;
+      } else {
+        errorCount = 1;
+      }
+      lastErrorTime = now;
+
+      if (errorCount > 3) {
+        console.error("Too many consecutive video load errors. Pausing playback attempts.");
+        addStatusLine("VIDEO DECODER ERROR: CRITICAL FAILURE", "alert");
+        return;
+      }
+
+      // If playlist is 1 or empty, don't loop immediately, wait 5 seconds before retrying
+      if (playlist.length <= 1) {
+        addStatusLine("VIDEO LOAD FAILURE - RETRYING IN 5S", "warn");
+        setTimeout(playNextVideo, 5000);
+      } else {
+        playNextVideo();
+      }
     });
 
     // Initial state setup
     updateVideoState();
+
+    // Load the playlist and start playing
+    loadPlaylist();
   }
 
   const floatingToggle = document.getElementById('floating-toggle');
@@ -1226,6 +1408,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (ecoToggle) {
     ecoToggle.addEventListener('click', () => toggleEcoMode());
   }
+
+  // Horny toggle button listener
+  const hornyToggle = document.getElementById('horny-mode-btn');
+  if (hornyToggle) {
+    hornyToggle.addEventListener('click', () => toggleHornyMode());
+  }
 });
 
 // -------------------------------------------------------------
@@ -1252,33 +1440,68 @@ function toggleEcoMode(enable = null, isAuto = false) {
   }
   playChirp('sweep');
   addStatusLine(`POWER STATE: ${isEco ? 'ECO_POWER_SAVING' : 'PERFORMANCE_MAX'} MODE ENGAGED`, isEco ? "success" : "warn");
-  
+
+  const video = document.querySelector('.hud-video');
+  if (isEco) {
+    // Pause video decoder in eco mode — biggest single power saving
+    if (video && !video.paused) video.pause();
+  } else {
+    // Resume video when leaving eco mode
+    if (video && video.paused && !document.hidden && !videoTransitionPending) {
+      video.play().catch(err => console.warn('Eco-off resume failed:', err));
+    }
+  }
+
   // Update video state and polling schedule
   updateVideoState();
   scheduleNextResourceUpdate();
 }
 
-// requestAnimationFrame loop that updates lastRafTime and resumes when revealed
-function updateRafTime() {
-  lastRafTime = Date.now();
-
-  // If previously obscured (RAF stopped) and now resumed (RAF restarted)
-  if (wasObscured) {
-    wasObscured = false;
-    resumeAllJS();
+let isHornyMode = false;
+function toggleHornyMode() {
+  const btn = document.getElementById('horny-mode-btn');
+  isHornyMode = !isHornyMode;
+  if (btn) btn.classList.toggle('active');
+  playChirp('glitch');
+  
+  if (isHornyMode) {
+    addStatusLine(`HORNY MODE: ENGAGED`, "warn");
+    playlist = ['cozy_vibe3.mp4'];
+    playlistIndex = 0;
+    setVideoSource(playlist[0]);
+  } else {
+    addStatusLine(`HORNY MODE: DISENGAGED`, "success");
+    loadPlaylist();
   }
-
-  requestAnimationFrame(updateRafTime);
 }
-requestAnimationFrame(updateRafTime);
 
-// Independent watchdog timer running every second to detect when RAF has stopped (obscured)
+// Lightweight visibility tracker using requestAnimationFrame to update lastRafTime.
+// When the browser/compositor covers the window or goes to sleep, RAF callbacks stop.
+function rafLoop() {
+  lastRafTime = Date.now();
+  requestAnimationFrame(rafLoop);
+}
+requestAnimationFrame(rafLoop);
+
+// Watchdog: runs every 2 seconds to check if RAF has stopped or resumed
 setInterval(() => {
-  const isObscured = (Date.now() - lastRafTime) > 2000;
-  if (isObscured && !isSuspended) {
-    wasObscured = true;
-    suspendAllJS();
-    addStatusLine('WALLPAPER COVERED: SUSPENDING HUD', 'info');
+  const timeSinceLastRaf = Date.now() - lastRafTime;
+
+  if (isSuspended) {
+    // We are currently suspended. Check if the window is uncovered (RAF resumed).
+    if (wasObscured && timeSinceLastRaf < 2000) {
+      wasObscured = false;
+      resumeAllJS();
+      addStatusLine('WALLPAPER UNCOVERED: RESUMING HUD', 'success');
+    }
+  } else {
+    // We are running. Check if the window has been covered (RAF stopped).
+    if (timeSinceLastRaf > 3500) {
+      wasObscured = true;
+      suspendAllJS();
+      updateVideoState();
+      addStatusLine('WALLPAPER COVERED: SUSPENDING HUD', 'info');
+    }
   }
-}, 1000);
+}, 2000);
 
