@@ -396,16 +396,22 @@ body {
   position: relative;
 }
 
-.hud-video-container {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+.hud-aspect-wrapper {
+  position: relative;
   width: min(100%, 150vh);
   height: min(100%, 66.67vw);
   max-width: 1200px;
   max-height: 800px;
   aspect-ratio: 1200 / 800;
+  pointer-events: none;
+}
+
+.hud-video-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   z-index: 1;
   clip-path: polygon(29.17% 8.75%, 43.33% 8.75%, 45.83% 12.5%, 54.17% 12.5%, 56.67% 8.75%, 70.83% 8.75%, 87.5% 15%, 91.67% 27.5%, 91.67% 72.5%, 87.5% 85%, 70.83% 91.25%, 56.67% 91.25%, 54.17% 87.5%, 45.83% 87.5%, 43.33% 91.25%, 29.17% 91.25%, 12.5% 85%, 8.33% 72.5%, 8.33% 27.5%, 12.5% 15%);
@@ -1197,12 +1203,11 @@ body {
 }
 
 .cockpit-frame-svg {
-  width: min(100%, 150vh);
-  height: min(100%, 66.67vw);
-  max-width: 1200px;
-  max-height: 800px;
-  aspect-ratio: 1200 / 800;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   z-index: 2;
 }
 
@@ -1333,12 +1338,7 @@ body {
   height: 100vh !important;
 }
 
-.mode-clean .cockpit-frame-svg {
-  max-width: 95vw !important;
-  max-height: 95vh !important;
-}
-
-.mode-clean .hud-video-container {
+.mode-clean .hud-aspect-wrapper {
   max-width: 95vw !important;
   max-height: 95vh !important;
 }
