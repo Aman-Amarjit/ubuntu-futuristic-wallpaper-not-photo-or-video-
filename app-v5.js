@@ -134,8 +134,10 @@ async function loadPlaylist() {
     if (!res.ok) throw new Error('Failed to fetch video list');
     const data = await res.json();
     if (data.videos && data.videos.length > 0) {
-      const webmFiles = data.videos.filter(v => v.endsWith('.webm'));
-      playlist = webmFiles.length > 0 ? webmFiles : data.videos;
+      // Exclude cozy_vibe3 (Gwen video) from the normal playlist
+      const nonHornyVideos = data.videos.filter(v => !v.includes('cozy_vibe3'));
+      const webmFiles = nonHornyVideos.filter(v => v.endsWith('.webm'));
+      playlist = webmFiles.length > 0 ? webmFiles : nonHornyVideos;
     } else {
       playlist = ['cozy_vibe.webm'];
     }
@@ -144,11 +146,6 @@ async function loadPlaylist() {
     playlist = ['cozy_vibe.webm'];
   }
   playlistIndex = 0;
-
-  const video = document.querySelector('.hud-video');
-  if (video) {
-    video.loop = true;
-  }
 
   setVideoSource(playlist[0]);
 }
@@ -159,28 +156,53 @@ function setVideoSource(filename) {
 
   // Stop the old video cleanly before switching source
   video.pause();
+
+  // Explicitly remove nested source tags to prevent memory/resource leaks
+  const sources = video.querySelectorAll('source');
+  sources.forEach(source => {
+    source.removeAttribute('src');
+    source.remove();
+  });
+
   video.removeAttribute('src');
   video.load(); // flush the media pipeline
 
+  // Set looping dynamically: loop single videos, advance playlists on ended event
+  video.loop = (playlist.length <= 1);
+
   // Small delay to let the browser fully reset before assigning new src
   setTimeout(() => {
-    video.src = filename;
-    video.load();
+    const isHidden = document.hidden;
+    const isObscured = (Date.now() - lastRafTime) > 2000;
+    const isEco = document.body.classList.contains('eco-mode');
+    const shouldPauseVideo = isHidden || isObscured || isEco;
 
-    // Videos act as full-screen wallpapers, no scaling needed
-    video.style.transformOrigin = 'center center';
-    video.style.transform = 'translate3d(0, 0, 0)';
-
-    video.oncanplaythrough = () => {
-      video.oncanplaythrough = null;
-      videoTransitionPending = false;
-      if (!document.hidden && !isSuspended) {
-        video.play().catch(err => console.warn('play() failed for', filename, err));
+    if (shouldPauseVideo) {
+      // Defer video loading: store in pendingSrc and mark transition complete
+      video.dataset.pendingSrc = filename;
+      if (document.getElementById('feed-log')) {
+        addStatusLine(`QUEUED VIDEO: ${filename.toUpperCase()}`, 'info');
       }
-    };
+      videoTransitionPending = false;
+    } else {
+      video.src = filename;
+      video.load();
 
-    if (document.getElementById('feed-log')) {
-      addStatusLine(`NOW PLAYING: ${filename.toUpperCase()}`, 'info');
+      // Videos act as full-screen wallpapers, no scaling needed
+      video.style.transformOrigin = 'center center';
+      video.style.transform = 'translate3d(0, 0, 0)';
+
+      video.oncanplaythrough = () => {
+        video.oncanplaythrough = null;
+        videoTransitionPending = false;
+        if (!document.hidden && !isSuspended && !document.body.classList.contains('eco-mode')) {
+          video.play().catch(err => console.warn('play() failed for', filename, err));
+        }
+      };
+
+      if (document.getElementById('feed-log')) {
+        addStatusLine(`NOW PLAYING: ${filename.toUpperCase()}`, 'info');
+      }
     }
   }, 80);
 }
@@ -617,8 +639,16 @@ function updateVideoState() {
   const shouldPauseVideo = isHidden || isObscured || isEco;
 
   if (shouldPauseVideo) {
-    if (!video.paused) {
+    if (!video.paused || video.src) {
       video.pause();
+
+      // Completely unload the media pipeline and release memory/GPU decoders
+      if (video.src) {
+        video.dataset.pendingSrc = video.src;
+        video.removeAttribute('src');
+        video.load();
+      }
+
       if (isObscured && !isHidden) {
         wasObscured = true;
         addStatusLine("WALLPAPER COVERED: PAUSING DECODER", "info");
@@ -631,12 +661,25 @@ function updateVideoState() {
   } else {
     // Window is visible — ensure video plays
     document.body.classList.remove('window-obscured');
-    // Only resume if the source is fully loaded and no transition is in progress.
-    if (video.paused && video.readyState >= 3 && !videoTransitionPending) {
-      video.play().catch(err => {
-        console.warn("Failed to play primary video:", err);
-      });
-      addStatusLine("VIDEO DECODER ACTIVE: RESUMED", "success");
+
+    // Restore the source if it was unloaded
+    if (!video.src && video.dataset.pendingSrc) {
+      video.src = video.dataset.pendingSrc;
+      video.load();
+    }
+
+    // Play video
+    if (video.paused && !videoTransitionPending) {
+      video.play()
+        .then(() => {
+          if (wasObscured) {
+            wasObscured = false;
+            addStatusLine("WALLPAPER UNCOVERED: RESUMING HUD", "success");
+          }
+        })
+        .catch(err => {
+          console.warn("Failed to play primary video:", err);
+        });
     }
   }
 }
@@ -665,12 +708,6 @@ function suspendAllJS() {
 
   // Freeze all CSS animations & remove backdrop-filter cost
   document.body.classList.add('window-obscured');
-
-  // NOTE: Video is intentionally NOT paused here.
-  // suspendAllJS is triggered by visibilitychange (e.g. user switches apps briefly).
-  // Pausing the video on every focus-loss causes it to stop permanently because
-  // the resume path has race conditions with isSuspended guards.
-  // Video is only paused when the compositor fully covers the window (isObscured).
 }
 
 function resumeAllJS() {
@@ -689,13 +726,6 @@ function resumeAllJS() {
 
   // Resume CSS animations
   document.body.classList.remove('window-obscured');
-
-  // Ensure video is playing (restart if it was paused by obscuration)
-  const video = document.querySelector('.hud-video');
-  if (video && video.paused && !document.hidden) {
-    video.play().catch(err => console.warn('Resume play failed:', err));
-    addStatusLine('WALLPAPER UNCOVERED: RESUMING HUD', 'success');
-  }
 
   // Restart resource polling without double-polling
   updateResources().then(() => scheduleNextResourceUpdate());
@@ -1270,12 +1300,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         suspendAllJS();
-        if (!video.paused) video.pause();
+        updateVideoState();
       } else {
         resumeAllJS();
-        if (video.paused && !videoTransitionPending && !document.body.classList.contains('eco-mode')) {
-          video.play().catch(err => console.warn('Visibility resume failed:', err));
-        }
+        updateVideoState();
       }
     });
 
@@ -1441,17 +1469,6 @@ function toggleEcoMode(enable = null, isAuto = false) {
   playChirp('sweep');
   addStatusLine(`POWER STATE: ${isEco ? 'ECO_POWER_SAVING' : 'PERFORMANCE_MAX'} MODE ENGAGED`, isEco ? "success" : "warn");
 
-  const video = document.querySelector('.hud-video');
-  if (isEco) {
-    // Pause video decoder in eco mode — biggest single power saving
-    if (video && !video.paused) video.pause();
-  } else {
-    // Resume video when leaving eco mode
-    if (video && video.paused && !document.hidden && !videoTransitionPending) {
-      video.play().catch(err => console.warn('Eco-off resume failed:', err));
-    }
-  }
-
   // Update video state and polling schedule
   updateVideoState();
   scheduleNextResourceUpdate();
@@ -1492,7 +1509,7 @@ setInterval(() => {
     if (wasObscured && timeSinceLastRaf < 2000) {
       wasObscured = false;
       resumeAllJS();
-      addStatusLine('WALLPAPER UNCOVERED: RESUMING HUD', 'success');
+      updateVideoState();
     }
   } else {
     // We are running. Check if the window has been covered (RAF stopped).
