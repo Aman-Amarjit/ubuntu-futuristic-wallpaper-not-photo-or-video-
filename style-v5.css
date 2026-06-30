@@ -47,6 +47,38 @@
   --color-accent: hsl(0, 85%, 55%);
 }
 
+/* Sage Green — calm focus, earthy */
+.theme-sage {
+  --color-primary: hsl(150, 35%, 52%);
+  --color-primary-glow: hsla(150, 35%, 52%, 0.25);
+  --color-primary-bright: hsl(150, 45%, 72%);
+  --color-accent: hsl(75, 30%, 55%);
+}
+
+/* Soft Blue — logical clarity, clean lines */
+.theme-softblue {
+  --color-primary: hsl(215, 55%, 62%);
+  --color-primary-glow: hsla(215, 55%, 62%, 0.25);
+  --color-primary-bright: hsl(215, 70%, 80%);
+  --color-accent: hsl(190, 50%, 60%);
+}
+
+/* Muted Teal — deep thought, sophisticated */
+.theme-teal {
+  --color-primary: hsl(175, 40%, 48%);
+  --color-primary-glow: hsla(175, 40%, 48%, 0.25);
+  --color-primary-bright: hsl(175, 50%, 68%);
+  --color-accent: hsl(195, 45%, 55%);
+}
+
+/* Cream — warm, textured, low noise */
+.theme-cream {
+  --color-primary: hsl(40, 55%, 68%);
+  --color-primary-glow: hsla(40, 55%, 68%, 0.25);
+  --color-primary-bright: hsl(40, 65%, 82%);
+  --color-accent: hsl(25, 50%, 60%);
+}
+
 /* Base resets and configuration */
 * {
   box-sizing: border-box;
@@ -131,7 +163,7 @@ body {
   grid-template-rows: auto 1fr auto;
   height: 100vh;
   width: 100vw;
-  padding: 15px 15px 15px 80px; /* Shifted left side to avoid collision with Ubuntu dock */
+  padding: 36px 15px 15px 80px; /* Top: clear Ubuntu top taskbar (~28px). Left: clear Ubuntu side dock */
   gap: 15px;
   position: relative;
   z-index: 10;
@@ -398,11 +430,11 @@ body {
 
 .hud-aspect-wrapper {
   position: relative;
-  width: min(100%, 150vh);
-  height: min(100%, 66.67vw);
-  max-width: 1200px;
-  max-height: 800px;
-  aspect-ratio: 1200 / 800;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
   pointer-events: none;
 }
 
@@ -414,8 +446,11 @@ body {
   height: 100%;
   overflow: hidden;
   z-index: 1;
-  clip-path: polygon(29.17% 8.75%, 43.33% 8.75%, 45.83% 12.5%, 54.17% 12.5%, 56.67% 8.75%, 70.83% 8.75%, 87.5% 15%, 91.67% 27.5%, 91.67% 72.5%, 87.5% 85%, 70.83% 91.25%, 56.67% 91.25%, 54.17% 87.5%, 45.83% 87.5%, 43.33% 91.25%, 29.17% 91.25%, 12.5% 85%, 8.33% 72.5%, 8.33% 27.5%, 12.5% 15%);
-  -webkit-clip-path: polygon(29.17% 8.75%, 43.33% 8.75%, 45.83% 12.5%, 54.17% 12.5%, 56.67% 8.75%, 70.83% 8.75%, 87.5% 15%, 91.67% 27.5%, 91.67% 72.5%, 87.5% 85%, 70.83% 91.25%, 56.67% 91.25%, 54.17% 87.5%, 45.83% 87.5%, 43.33% 91.25%, 29.17% 91.25%, 12.5% 85%, 8.33% 72.5%, 8.33% 27.5%, 12.5% 15%);
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  clip-path: polygon(9.375% 4.6296%, 19.7917% 13.8889%, 80.2083% 13.8889%, 90.625% 4.6296%, 90.625% 95.3704%, 80.2083% 86.1111%, 19.7917% 86.1111%, 9.375% 95.3704%);
+  -webkit-clip-path: polygon(9.375% 4.6296%, 19.7917% 13.8889%, 80.2083% 13.8889%, 90.625% 4.6296%, 90.625% 95.3704%, 80.2083% 86.1111%, 19.7917% 86.1111%, 9.375% 95.3704%);
 }
 
 .hud-core-wrapper {
@@ -458,7 +493,43 @@ body {
   object-fit: cover;
   -webkit-backface-visibility: hidden;
   transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  clip-path: polygon(9.375% 4.6296%, 19.7917% 13.8889%, 80.2083% 13.8889%, 90.625% 4.6296%, 90.625% 95.3704%, 80.2083% 86.1111%, 19.7917% 86.1111%, 9.375% 95.3704%);
+  -webkit-clip-path: polygon(9.375% 4.6296%, 19.7917% 13.8889%, 80.2083% 13.8889%, 90.625% 4.6296%, 90.625% 95.3704%, 80.2083% 86.1111%, 19.7917% 86.1111%, 9.375% 95.3704%);
+  transition: filter 0.3s ease;
+}
+
+/* Theme-specific filters for the pre-rendered video to match the HUD color */
+.theme-cyan .hud-video {
   filter: brightness(1.35) contrast(1.15) drop-shadow(0 0 10px rgba(0, 200, 255, 0.5));
+}
+
+.theme-green .hud-video {
+  filter: brightness(1.35) contrast(1.15) hue-rotate(-50deg) drop-shadow(0 0 10px rgba(0, 255, 0, 0.5));
+}
+
+.theme-red .hud-video {
+  filter: brightness(1.35) contrast(1.15) hue-rotate(150deg) drop-shadow(0 0 10px rgba(255, 0, 0, 0.5));
+}
+
+.theme-amber .hud-video {
+  filter: brightness(1.35) contrast(1.15) hue-rotate(-157deg) drop-shadow(0 0 10px rgba(255, 191, 0, 0.5));
+}
+
+.theme-sage .hud-video {
+  filter: brightness(1.25) contrast(1.1) hue-rotate(-170deg) saturate(0.7) drop-shadow(0 0 10px rgba(100, 180, 130, 0.45));
+}
+
+.theme-softblue .hud-video {
+  filter: brightness(1.2) contrast(1.1) hue-rotate(170deg) saturate(0.75) drop-shadow(0 0 10px rgba(100, 140, 210, 0.45));
+}
+
+.theme-teal .hud-video {
+  filter: brightness(1.25) contrast(1.1) hue-rotate(-145deg) saturate(0.65) drop-shadow(0 0 10px rgba(60, 180, 160, 0.45));
+}
+
+.theme-cream .hud-video {
+  filter: brightness(1.3) contrast(1.05) hue-rotate(-155deg) saturate(0.5) sepia(0.25) drop-shadow(0 0 10px rgba(210, 180, 120, 0.4));
 }
 
 .hud-video-overlay {
@@ -470,6 +541,8 @@ body {
   background-color: var(--color-primary-glow);
   pointer-events: none;
   opacity: 0.25;
+  clip-path: polygon(9.375% 4.6296%, 19.7917% 13.8889%, 80.2083% 13.8889%, 90.625% 4.6296%, 90.625% 95.3704%, 80.2083% 86.1111%, 19.7917% 86.1111%, 9.375% 95.3704%);
+  -webkit-clip-path: polygon(9.375% 4.6296%, 19.7917% 13.8889%, 80.2083% 13.8889%, 90.625% 4.6296%, 90.625% 95.3704%, 80.2083% 86.1111%, 19.7917% 86.1111%, 9.375% 95.3704%);
   transition: background-color 0.3s ease;
 }
 
@@ -485,6 +558,7 @@ body {
 /* Center Readouts */
 .hud-readout {
   position: absolute;
+  z-index: 3;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1.4;
@@ -517,35 +591,34 @@ body {
   transform: scale(1.05);
 }
 
-/* Corner readouts — sit OUTSIDE the video in the gap between
-   the video frame and the cockpit border. No video overlap. */
+/* Corner readouts — sit INSIDE the video area, aligned with the scale tapes. */
 .readout-top-left {
-  top: 2%;
-  left: 1%;
+  top: 14%;
+  left: 18%;
   text-align: left;
   border-left: 2px solid var(--color-primary);
   border-right: none;
 }
 
 .readout-top-right {
-  top: 2%;
-  right: 1%;
+  top: 14%;
+  right: 18%;
   text-align: right;
   border-right: 2px solid var(--color-primary);
   border-left: none;
 }
 
 .readout-bottom-left {
-  bottom: 2%;
-  left: 1%;
+  bottom: 14%;
+  left: 18%;
   text-align: left;
   border-left: 2px solid var(--color-primary);
   border-right: none;
 }
 
 .readout-bottom-right {
-  bottom: 2%;
-  right: 1%;
+  bottom: 14%;
+  right: 18%;
   text-align: right;
   border-right: 2px solid var(--color-primary);
   border-left: none;
@@ -1143,6 +1216,105 @@ body {
   box-shadow: 0 0 8px var(--color-primary-glow);
 }
 
+/* News Hover Tooltip */
+#news-tooltip {
+  position: fixed;
+  z-index: 99999;
+  pointer-events: none;
+  width: 280px;
+  background: rgba(4, 8, 16, 0.96);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  padding: 12px 14px;
+  box-shadow:
+    0 0 0 1px var(--color-primary-glow),
+    0 8px 32px rgba(0, 0, 0, 0.8),
+    0 0 20px var(--color-primary-glow);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#news-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.nt-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--color-accent);
+  letter-spacing: 0.15em;
+  opacity: 0.8;
+}
+
+.nt-title {
+  font-family: var(--font-hud);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary-bright);
+  line-height: 1.4;
+  text-shadow: 0 0 6px var(--color-primary-glow);
+}
+
+.nt-summary {
+  margin: 2px 0;
+}
+
+.nt-summary-text {
+  font-family: var(--font-hud);
+  font-size: 0.72rem;
+  color: var(--color-text);
+  line-height: 1.45;
+  display: block;
+}
+
+.nt-summary-loading {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--color-accent);
+  letter-spacing: 0.05em;
+  display: block;
+  animation: nt-blink 1.2s infinite alternate;
+}
+
+@keyframes nt-blink {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+.nt-divider {
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-primary), transparent);
+  opacity: 0.5;
+}
+
+.nt-meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+
+.nt-source {
+  color: var(--color-primary);
+}
+
+.nt-date {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.nt-hint {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--color-accent);
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
 /* Theme picker */
 .theme-picker-container {
   display: flex;
@@ -1152,15 +1324,17 @@ body {
 
 .theme-buttons {
   display: flex;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: 6px;
 }
 
 .theme-btn {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
+  flex-shrink: 0;
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
@@ -1173,10 +1347,14 @@ body {
   transform: scale(1.15);
 }
 
-.theme-cyan-btn { background-color: hsl(195, 90%, 55%); }
-.theme-green-btn { background-color: hsl(145, 80%, 50%); }
-.theme-red-btn { background-color: hsl(345, 90%, 55%); }
-.theme-amber-btn { background-color: hsl(38, 95%, 55%); }
+.theme-cyan-btn   { background-color: hsl(195, 90%, 55%); }
+.theme-green-btn  { background-color: hsl(145, 80%, 50%); }
+.theme-red-btn    { background-color: hsl(345, 90%, 55%); }
+.theme-amber-btn  { background-color: hsl(38, 95%, 55%); }
+.theme-sage-btn   { background-color: hsl(150, 35%, 52%); }
+.theme-softblue-btn { background-color: hsl(215, 55%, 62%); }
+.theme-teal-btn   { background-color: hsl(175, 40%, 48%); }
+.theme-cream-btn  { background-color: hsl(40, 55%, 68%); }
 
 /* Accessibility support */
 @media (prefers-reduced-motion: reduce) {

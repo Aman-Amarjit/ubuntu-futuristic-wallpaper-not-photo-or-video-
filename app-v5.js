@@ -1,3 +1,11 @@
+// Restore saved theme immediately to avoid flash of default color
+(function() {
+  const saved = localStorage.getItem('hudTheme');
+  if (saved) {
+    document.body.className = saved;
+  }
+})();
+
 // Web Audio API synthesizer for native sci-fi sound effects
 let audioCtx = null;
 let ambientHumNode = null;
@@ -325,8 +333,8 @@ async function updateResources() {
       indicatorEl.className = 'status-indicator online';
     }
     const diagnosticEl = document.querySelector('.diagnostic-readout');
-    if (diagnosticEl && diagnosticEl.textContent !== 'SYSTEM ACTIVE // ALL CORES NOMINAL') {
-      diagnosticEl.textContent = 'SYSTEM ACTIVE // ALL CORES NOMINAL';
+    if (diagnosticEl && diagnosticEl.textContent !== 'WELCOME') {
+      diagnosticEl.textContent = 'WELCOME';
     }
 
     // Update DOM readouts
@@ -658,6 +666,7 @@ function updateVideoState() {
     if (isObscured) {
       document.body.classList.add('window-obscured');
     }
+
   } else {
     // Window is visible — ensure video plays
     document.body.classList.remove('window-obscured');
@@ -681,6 +690,8 @@ function updateVideoState() {
           console.warn("Failed to play primary video:", err);
         });
     }
+
+
   }
 }
 
@@ -708,6 +719,8 @@ function suspendAllJS() {
 
   // Freeze all CSS animations & remove backdrop-filter cost
   document.body.classList.add('window-obscured');
+
+
 }
 
 function resumeAllJS() {
@@ -729,6 +742,8 @@ function resumeAllJS() {
 
   // Restart resource polling without double-polling
   updateResources().then(() => scheduleNextResourceUpdate());
+
+
 }
 
 // Start scheduling — call updateResources immediately so stats show on first load,
@@ -845,6 +860,11 @@ function renderNews(newsItems) {
     newsEntry.appendChild(link);
     newsEntry.appendChild(meta);
 
+    // Hover tooltip
+    newsEntry.addEventListener('mouseenter', (e) => showNewsTooltip(e, item));
+    newsEntry.addEventListener('mousemove', (e) => positionNewsTooltip(e));
+    newsEntry.addEventListener('mouseleave', () => hideNewsTooltip());
+
     newsBox.appendChild(newsEntry);
   });
 }
@@ -876,6 +896,99 @@ updateNewsFeed();
 
 // Poll every 5 minutes
 setInterval(updateNewsFeed, 300000);
+
+// -------------------------------------------------------------
+// News Hover Tooltip with Live Summary
+// -------------------------------------------------------------
+const newsTooltip = document.createElement('div');
+newsTooltip.id = 'news-tooltip';
+newsTooltip.innerHTML = `
+  <div class="nt-tag">// NEWS INTERCEPT //</div>
+  <div class="nt-title" id="nt-title"></div>
+  <div class="nt-divider"></div>
+  <div class="nt-summary" id="nt-summary">
+    <span class="nt-summary-loading" id="nt-summary-text">FETCHING INTEL...</span>
+  </div>
+  <div class="nt-meta">
+    <span class="nt-source" id="nt-source"></span>
+    <span class="nt-date" id="nt-date"></span>
+  </div>
+  <div class="nt-hint" id="nt-hint"></div>
+`;
+document.body.appendChild(newsTooltip);
+
+let _tooltipAbortController = null;
+let _tooltipHideTimer = null;
+
+function showNewsTooltip(e, item) {
+  // Cancel any pending fetch from previous item
+  if (_tooltipAbortController) {
+    _tooltipAbortController.abort();
+    _tooltipAbortController = null;
+  }
+  clearTimeout(_tooltipHideTimer);
+
+  // Populate static fields
+  document.getElementById('nt-title').textContent = item.title;
+  document.getElementById('nt-source').textContent = `[${item.source}]`;
+  document.getElementById('nt-date').textContent = formatNewsDate(item.date);
+  document.getElementById('nt-hint').textContent =
+    (item.link && item.link !== '#') ? '▶ CLICK TO OPEN IN BROWSER' : '— NO LINK AVAILABLE —';
+
+  // Reset summary to loading state
+  const summaryEl = document.getElementById('nt-summary-text');
+  summaryEl.textContent = 'FETCHING INTEL...';
+  summaryEl.className = 'nt-summary-loading';
+
+  newsTooltip.classList.add('visible');
+  positionNewsTooltip(e);
+
+  // Fetch summary if there's a real link
+  if (item.link && item.link !== '#') {
+    _tooltipAbortController = new AbortController();
+    fetch(`http://localhost:8000/api/summarize?url=${encodeURIComponent(item.link)}`, {
+      signal: _tooltipAbortController.signal
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.summary) {
+          summaryEl.textContent = data.summary;
+          summaryEl.className = 'nt-summary-text';
+          positionNewsTooltip(e); // reposition after content change
+        }
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          summaryEl.textContent = 'SUMMARY UNAVAILABLE';
+          summaryEl.className = 'nt-summary-text';
+        }
+      });
+  } else {
+    summaryEl.textContent = 'NO SOURCE LINK — OFFLINE DATA';
+    summaryEl.className = 'nt-summary-text';
+  }
+}
+
+function positionNewsTooltip(e) {
+  const tt = newsTooltip;
+  const pad = 14;
+  const tw = tt.offsetWidth;
+  const th = tt.offsetHeight;
+  let x = e.clientX + pad;
+  let y = e.clientY + pad;
+  if (x + tw > window.innerWidth - pad) x = e.clientX - tw - pad;
+  if (y + th > window.innerHeight - pad) y = e.clientY - th - pad;
+  tt.style.left = `${x}px`;
+  tt.style.top  = `${y}px`;
+}
+
+function hideNewsTooltip() {
+  if (_tooltipAbortController) {
+    _tooltipAbortController.abort();
+    _tooltipAbortController = null;
+  }
+  newsTooltip.classList.remove('visible');
+}
 
 // -------------------------------------------------------------
 // Desktop File Explorer Controller
@@ -1148,6 +1261,9 @@ function changeTheme(themeName) {
   document.body.className = '';
   document.body.classList.add(themeName);
 
+  // Persist theme selection across restarts
+  localStorage.setItem('hudTheme', themeName);
+
   // Update theme buttons visual state
   document.querySelectorAll('.theme-btn').forEach(btn => {
     if (btn.getAttribute('data-theme') === themeName) {
@@ -1249,18 +1365,18 @@ function triggerGlitch() {
 // Interactive Speed & Altitude Tapes Scale Pointers
 // -------------------------------------------------------------
 function updateScales() {
-  // Left Pointer: CPU utilization (0% = y=600, 100% = y=200)
+  // Left Pointer: CPU utilization (0% = y=1020, 100% = y=60)
   const leftPointer = getCachedEl('left-pointer');
   if (leftPointer) {
-    const leftY = 600 - (cpuVal / 100) * 400;
-    leftPointer.setAttribute('transform', `translate(0, ${leftY - 400})`);
+    const leftY = 1020 - (cpuVal / 100) * 960;
+    leftPointer.setAttribute('transform', `translate(0, ${leftY - 540})`);
   }
 
-  // Right Pointer: Memory utilization mapped to MEM_LOAD scale (y=600 to y=200)
+  // Right Pointer: Memory utilization mapped to MEM_LOAD scale (y=1020 to y=60)
   const rightPointer = getCachedEl('right-pointer');
   if (rightPointer) {
-    const rightY = 600 - (ramVal / 100) * 400;
-    rightPointer.setAttribute('transform', `translate(0, ${rightY - 400})`);
+    const rightY = 1020 - (ramVal / 100) * 960;
+    rightPointer.setAttribute('transform', `translate(0, ${rightY - 540})`);
   }
 }
 
@@ -1437,10 +1553,14 @@ document.addEventListener('DOMContentLoaded', () => {
     ecoToggle.addEventListener('click', () => toggleEcoMode());
   }
 
-  // Horny toggle button listener
-  const hornyToggle = document.getElementById('horny-mode-btn');
-  if (hornyToggle) {
-    hornyToggle.addEventListener('click', () => toggleHornyMode());
+  // Restore eco mode from previous session
+  if (localStorage.getItem('ecoMode') === 'true') {
+    // Restore as a user-intent action so the battery auto-logic doesn't override it
+    const btn = document.getElementById('eco-toggle-btn');
+    document.body.classList.add('eco-mode');
+    if (btn) btn.classList.add('active');
+    userPowerOverride = true;
+    addStatusLine('ECO POWER MODE: RESTORED FROM SAVED SETTINGS', 'success');
   }
 });
 
@@ -1466,6 +1586,10 @@ function toggleEcoMode(enable = null, isAuto = false) {
     isEco = document.body.classList.toggle('eco-mode');
     if (btn) btn.classList.toggle('active');
   }
+
+  // Persist the user's eco mode preference across restarts
+  localStorage.setItem('ecoMode', isEco ? 'true' : 'false');
+
   playChirp('sweep');
   addStatusLine(`POWER STATE: ${isEco ? 'ECO_POWER_SAVING' : 'PERFORMANCE_MAX'} MODE ENGAGED`, isEco ? "success" : "warn");
 
@@ -1474,23 +1598,7 @@ function toggleEcoMode(enable = null, isAuto = false) {
   scheduleNextResourceUpdate();
 }
 
-let isHornyMode = false;
-function toggleHornyMode() {
-  const btn = document.getElementById('horny-mode-btn');
-  isHornyMode = !isHornyMode;
-  if (btn) btn.classList.toggle('active');
-  playChirp('glitch');
-  
-  if (isHornyMode) {
-    addStatusLine(`HORNY MODE: ENGAGED`, "warn");
-    playlist = ['cozy_vibe3.mp4'];
-    playlistIndex = 0;
-    setVideoSource(playlist[0]);
-  } else {
-    addStatusLine(`HORNY MODE: DISENGAGED`, "success");
-    loadPlaylist();
-  }
-}
+
 
 // Lightweight visibility tracker using requestAnimationFrame to update lastRafTime.
 // When the browser/compositor covers the window or goes to sleep, RAF callbacks stop.

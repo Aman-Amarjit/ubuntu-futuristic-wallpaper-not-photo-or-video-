@@ -80,7 +80,7 @@ class HUDRequestHandler(http.server.SimpleHTTPRequestHandler):
         parsed_url = urllib.parse.urlparse(self.path)
         clean_path = urllib.parse.unquote(parsed_url.path)
         
-        # Intercept and serve video files with Range request support (206 Partial Content)
+        # Intercept and serve video/audio files with Range request support (206 Partial Content)
         if clean_path.endswith(".mp4"):
             filepath = os.path.join(DIRECTORY, clean_path.lstrip("/"))
             if os.path.exists(filepath):
@@ -91,6 +91,11 @@ class HUDRequestHandler(http.server.SimpleHTTPRequestHandler):
             if os.path.exists(filepath):
                 self.handle_static_range(filepath, "video/webm")
                 return
+        elif clean_path.endswith(".mp3"):
+            filepath = os.path.join(DIRECTORY, clean_path.lstrip("/"))
+            if os.path.exists(filepath):
+                self.handle_static_range(filepath, "audio/mpeg")
+                return
                 
         if parsed_url.path == "/api/stats":
             self.handle_api_stats()
@@ -98,6 +103,8 @@ class HUDRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_api_news()
         elif parsed_url.path == "/api/open":
             self.handle_api_open(parsed_url.query)
+        elif parsed_url.path == "/api/summarize":
+            self.handle_api_summarize(parsed_url.query)
         elif parsed_url.path == "/api/desktop-files":
             self.handle_api_desktop_files(parsed_url.query)
         elif parsed_url.path == "/api/open-desktop-item":
@@ -179,6 +186,67 @@ class HUDRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response(400, {"error": "No url provided"})
         except Exception as e:
             self.send_json_response(500, {"error": str(e)})
+
+    # Cache: url -> (summary_text, timestamp)
+    _summary_cache = {}
+
+    def handle_api_summarize(self, query):
+        """Fetch a news article URL, strip HTML, return first ~3 sentences as a summary."""
+        import re
+        try:
+            params = urllib.parse.parse_qs(query)
+            url = params.get("url", [""])[0]
+            if not url:
+                self.send_json_response(400, {"error": "No url provided"})
+                return
+
+            now = time.time()
+            cached = HUDRequestHandler._summary_cache.get(url)
+            if cached and (now - cached[1]) < 3600:  # 1 hour cache
+                self.send_json_response(200, {"summary": cached[0]})
+                return
+
+            req = urllib.request.Request(
+                url,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                }
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                raw_html = resp.read().decode('utf-8', errors='replace')
+
+            # Remove scripts, styles, nav, footer, header tags entirely
+            clean = re.sub(r'<(script|style|nav|footer|header|aside|form|button|svg|noscript)[^>]*>.*?</\1>', ' ', raw_html, flags=re.DOTALL | re.IGNORECASE)
+            # Strip remaining tags
+            clean = re.sub(r'<[^>]+>', ' ', clean)
+            # Decode HTML entities
+            clean = html.unescape(clean)
+            # Collapse whitespace
+            clean = re.sub(r'[\r\n\t ]+', ' ', clean).strip()
+
+            # Split into sentences (basic: split on . ! ? followed by space+capital)
+            sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', clean)
+
+            # Filter: keep sentences between 40 and 300 chars (skip boilerplate/nav crumbs)
+            good = [s.strip() for s in sentences if 40 <= len(s.strip()) <= 300]
+
+            # Take first 3 good sentences
+            summary = ' '.join(good[:3])
+            if not summary:
+                summary = clean[:280].rsplit(' ', 1)[0] + '…'
+
+            # Trim to 350 chars max
+            if len(summary) > 350:
+                summary = summary[:347].rsplit(' ', 1)[0] + '…'
+
+            HUDRequestHandler._summary_cache[url] = (summary, now)
+            self.send_json_response(200, {"summary": summary})
+
+        except Exception as e:
+            self.send_json_response(200, {"summary": "Summary unavailable — article could not be fetched."})
+
 
     def handle_api_desktop_files(self, query):
         try:

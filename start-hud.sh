@@ -22,7 +22,7 @@ sleep 0.5
 echo "Syncing HUD files to Hidamari sandbox folder..."
 mkdir -p "$HOME/Videos/Hidamari"
 rm -f "$HOME/Videos/Hidamari/style-v4.css" "$HOME/Videos/Hidamari/app-v4.js" "$HOME/Videos/Hidamari/b6ce399ac108494e8e845e4633b81285.webm" "$HOME/Videos/Hidamari/b6ce399ac108494e8e845e4633b81285.mp4" "$HOME/Videos/Hidamari/Colorful Skincare Routine Ideas for a Cozy Vibe.mp4" "$HOME/Videos/Hidamari/cozy_vibe.mp4"
-cp -f "$HOME/Desktop/screen/index.html" "$HOME/Desktop/screen/style-v5.css" "$HOME/Desktop/screen/app-v5.js" "$HOME/Desktop/screen/"*.webm "$HOME/Desktop/screen/"*.mp4 "$HOME/Videos/Hidamari/" 2>/dev/null || true
+cp -f "$HOME/Desktop/screen/index.html" "$HOME/Desktop/screen/style-v5.css" "$HOME/Desktop/screen/app-v5.js" "$HOME/Desktop/screen/"*.webm "$HOME/Desktop/screen/"*.mp4 "$HOME/Desktop/screen/"*.mp3 "$HOME/Videos/Hidamari/" 2>/dev/null || true
 
 echo "Starting HUD Stats Server via systemd..."
 systemctl --user daemon-reload
