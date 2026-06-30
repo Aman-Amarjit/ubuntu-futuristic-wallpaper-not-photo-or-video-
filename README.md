@@ -17,11 +17,12 @@ A sci-fi cyberpunk heads-up display rendered as an interactive **live desktop wa
 - 🎬 **Live video feed** in the center HUD panel (looping `.mp4` playback)
 - 📊 **Real-time system stats** — CPU, RAM, Disk usage with animated progress bars
 - 🌡️ **Hardware telemetry** — CPU temperature, battery level, uptime, hostname, kernel, local IP
-- 📡 **Live news feed** — fetched and displayed with relative timestamps
+- 📡 **Live news feed** — fetched and displayed with relative timestamps, featuring hover tooltips with live AI-style summaries
 - 🗂️ **Desktop file explorer** — browse and launch files directly from the wallpaper
 - ⚡ **CPU/RAM scale tapes** — aviation-style left (CPU) and right (RAM) pointers
-- 🎨 **4 color themes** — Cyan (Aero), Green (Matrix), Red (Cyberpunk), Amber (Solar)
-- 🔊 **Web Audio synthesizer** — ambient reactor hum + UI chirp sounds
+- 🎨 **8 color themes** — Cyan (Aero), Green (Matrix), Red (Cyberpunk), Amber (Solar), Sage (Focus), Soft Blue (Clarity), Teal (Deep), Cream (Warm)
+- 🔊 **Web Audio & MP3 Support** — ambient reactor hum, UI chirp sounds, and custom MP3 background audio
+- 💾 **Settings Persistence** — theme preferences and Eco Power Mode state are automatically saved to `localStorage` and restored on startup
 - 📺 **CRT scanline filter** — optional retro overlay
 - 🌿 **Eco Power Mode** — reduces polling on battery, disables animations
 - 🛸 **Clean Mode** — hides all panels for a minimal fullscreen video wallpaper
@@ -266,9 +267,11 @@ This script:
 | `GET /` | Serves `index.html` |
 | `GET /api/stats` | CPU, RAM, disk, temp, battery, net I/O, top processes |
 | `GET /api/news` | Fetches latest tech headlines via RSS |
+| `GET /api/summarize?url=<url>` | Fetches and extracts a short preview/summary of an article URL |
 | `GET /api/desktop-files?path=.` | Lists files/folders on the Desktop |
 | `GET /api/open?url=<url>` | Opens a URL in the default browser |
 | `GET /api/open-desktop-item?path=<path>` | Launches a file/folder via `xdg-open` |
+
 
 ---
 
@@ -307,6 +310,11 @@ This script:
 | **Green** | Matrix terminal green |
 | **Red** | Cyberpunk red |
 | **Amber** | Solar retro amber |
+| **Sage** | Focused forest sage green |
+| **Soft Blue** | Clear soft sky blue |
+| **Teal** | Deep maritime muted teal |
+| **Cream** | Warm retro analog cream |
+
 
 ---
 
@@ -369,6 +377,29 @@ EOF
 
 ---
 
+## 🛑 Disabling / Stopping the HUD
+
+If you want to stop the HUD system from running and prevent it from opening automatically when logging in or restarting:
+
+1. **Stop & Disable the Stats Server (systemd):**
+   ```bash
+   systemctl --user disable --now hud-stats-server.service
+   ```
+
+2. **Remove the Autostart Entries:**
+   ```bash
+   rm -f ~/.config/autostart/hud-wallpaper.desktop ~/.config/autostart/io.github.jeffshee.Hidamari.desktop
+   ```
+
+3. **Kill Remaining Wallpaper Processes:**
+   ```bash
+   pkill -9 -f hidamari
+   pkill -9 -f bwrap
+   ```
+
+---
+
 ## 📝 License
 
 Personal project. Not licensed for redistribution.
+
